@@ -13,11 +13,11 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--interactive', '-i', action='store_true', help='Assume Role interactively')
 parser.add_argument('--alias', help='AWS SSO Account Alias')
+parser.add_argument('--username', help="Username")
 parser.add_argument('--region', default='us-east-1', help='AWS Region')
 parser.add_argument('--output', default='json', help='Output text type. Typically json or text')
 parser.add_argument('--account', help="Account number")
 parser.add_argument('--role', help="Role to assume")
-parser.add_argument('--username', help="Username")
 parser.add_argument('--list', action='store_true', help="List accounts and roles that can be assumed")
 args = parser.parse_args()
 
@@ -121,15 +121,16 @@ def main(args):
     soup = BeautifulSoup(driver.page_source, 'lxml')
 
     count = 0
-    accountid = []
+    accountids = []
     for i in (soup.find_all('portal-instance')):
         print(f"{count}: {i.text.strip()}")
-        accountid.append(i['id'])
+        accountids.append(i['id'])
         count += 1
 
-    if args.interactive == True:
+    if args.interactive == True or not account:
         get_accountid = int(input("Enter account: "))
-    aws_account_role = check_element(accountid[get_accountid], driver)
+
+    aws_account_role = check_element(accountids[get_accountid], driver)
 
     aws_account_role.click()
     time.sleep(3)
@@ -176,7 +177,10 @@ def main(args):
     #Generate dict to pass to credentials file
     aws_creds_dict = {'region': region, 'output': output}
     for i in codelines[-3:]:
-        aws_creds_dict[i.getText().split('=')[0].strip()] = i.getText().split('=')[1].strip()
+        # Convert string to raw to prevent python from interpreting special characters, eg. /n
+        raw_string = r'{}'.format(i.getText().split('=')[1].strip())
+        #aws_creds_dict[i.getText().split('=')[0].strip()] = i.getText().split('=')[1].strip()
+        aws_creds_dict[i.getText().split('=')[0].strip()] = raw_string
 
     write_aws_creds(aws_creds_dict)
 
