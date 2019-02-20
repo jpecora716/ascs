@@ -2,13 +2,15 @@ from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
+from re import findall
 import getpass
 import os
 import time
 import configparser
 import argparse
 
-#TO DO: check if chromedriver exists in path, otherwise check current directory. if it doesn't exist in either location, fail.
+#TO DO: check if chromedriver exists in path, otherwise check current directory.
+#if it doesn't exist in either location, fail.
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--interactive', '-i', action='store_true', help='Assume Role interactively')
@@ -122,14 +124,22 @@ def main(args):
 
     count = 0
     accountids = []
+    accountnames = []
     for i in (soup.find_all('portal-instance')):
-        print(f"{count}: {i.text.strip()}")
+        if args.interactive == True or not account:
+            print(f"{count}: {i.text.strip()}")
         accountids.append(i['id'])
+        # Remove account number before adding to accountnames
+        find_accountname = findall("\(.*\)", i.text.strip())
+        accountnames.append(find_accountname[0][1:-1])
+        #print(f"{count}: {accountnames[count]}")
         count += 1
 
     if args.interactive == True or not account:
-        get_accountid = int(input("Enter account: "))
-
+        get_accountid = int(input(f"Enter account: "))
+    elif account in accountnames:
+        get_accountid = accountnames.index(account)
+    
     aws_account_role = check_element(accountids[get_accountid], driver)
 
     aws_account_role.click()
@@ -139,13 +149,24 @@ def main(args):
 
     count = 0
     roles = []
+    rolenames = []
     for j in (soup.find_all('portal-profile')):
-        print(f"{count}: {j.find('span', {'class': 'profileName'}).text}")
+        rolenames.append(j.find('span', {'class': 'profileName'}).text.strip())
+        if args.interactive == True or not role:
+            print(f"{count}: {rolenames[count]}")
         roles.append(j)
         count += 1
 
     # Prompt for which role to be assumed here
-    get_role = int(input("Get role: "))
+    # This is shit. Fix all of this and accounts above for proper error checking
+    if args.interactive == True or not role:
+        get_role = int(input("Get role: "))
+    elif role in rolenames:
+        get_role = rolenames.index(role)
+    else:
+        print(f"{role} not found in {rolenames}")
+        driver.quit()
+        exit()
 
     try:
         aws_roles = WebDriverWait(driver, wait).until(
