@@ -23,7 +23,7 @@ parser.add_argument('--role', help="Role to assume")
 parser.add_argument('--list', action='store_true', help="List accounts and roles that can be assumed")
 args = parser.parse_args()
 
-def check_element(element_id, driver):
+def check_element_id(element_id, driver):
     wait = 15
     try:
         element = WebDriverWait(driver, wait).until(
@@ -78,17 +78,17 @@ def main(args):
     driver.get(f"https://{aws_alias}.awsapps.com/start#/")
 
     #Check for username and password fields before sending keys
-    login_box = check_element('wdc_username', driver)
-    password_box = check_element('wdc_password', driver)
-    login_box.send_keys(username)
-    password_box.send_keys(password)
+    sel_login_box = check_element_id('wdc_username', driver)
+    sel_password_box = check_element_id('wdc_password', driver)
+    sel_login_box.send_keys(username)
+    sel_password_box.send_keys(password)
 
-    signin_button = check_element('wdc_login_button', driver)
-    signin_button.click()
+    sel_signin_button = check_element_id('wdc_login_button', driver)
+    sel_signin_button.click()
     
     # Wait for SSO Applications to load before sending to bs4
     try:
-        signin_button = WebDriverWait(driver, wait).until(
+        sel_signin_button = WebDriverWait(driver, wait).until(
         lambda x: x.find_element_by_tag_name('portal-application')
         )
     except TimeoutException:
@@ -101,13 +101,13 @@ def main(args):
     # Search through all badges for any named AWS Account
     for i in (soup.find_all('portal-application')):
         if i.text.find('AWS Account'):
-            awsappid = i['id']
+            sel_awsappid = i['id']
         else:
             print("There doesn't appear to be any AWS Accounts!")
             driver.quit()
 
-    aws_account = check_element(awsappid, driver)
-    aws_account.click()
+    sel_aws_account = check_element_id(sel_awsappid, driver)
+    sel_aws_account.click()
 
     #Wait for the AWS Accounts to load
     try:
@@ -123,16 +123,15 @@ def main(args):
     soup = BeautifulSoup(driver.page_source, 'lxml')
 
     count = 0
-    accountids = []
+    sel_accountids = []
     accountnames = []
     for i in (soup.find_all('portal-instance')):
         if args.interactive == True or not account:
             print(f"{count}: {i.text.strip()}")
-        accountids.append(i['id'])
+        sel_accountids.append(i['id'])
         # Remove account number before adding to accountnames
         find_accountname = findall("\(.*\)", i.text.strip())
         accountnames.append(find_accountname[0][1:-1])
-        #print(f"{count}: {accountnames[count]}")
         count += 1
 
     if args.interactive == True or not account:
@@ -140,9 +139,9 @@ def main(args):
     elif account in accountnames:
         get_accountid = accountnames.index(account)
     
-    aws_account_role = check_element(accountids[get_accountid], driver)
+    sel_aws_account_role = check_element_id(sel_accountids[get_accountid], driver)
 
-    aws_account_role.click()
+    sel_aws_account_role.click()
     time.sleep(3)
 
     soup = BeautifulSoup(driver.page_source, 'lxml')
@@ -169,23 +168,23 @@ def main(args):
         exit()
 
     try:
-        aws_roles = WebDriverWait(driver, wait).until(
+        sel_aws_roles = WebDriverWait(driver, wait).until(
             lambda x: x.find_elements_by_link_text('Command line or programmatic access')
         )
     except TimeoutException:
         print("Timeout waiting for account roles")
         driver.quit()
 
-    aws_roles[get_role].click()
+    sel_aws_roles[get_role].click()
 
     try:
-        aws_access_key_id = WebDriverWait(driver, wait).until(
+        sel_aws_access_key_id = WebDriverWait(driver, wait).until(
             lambda x: x.find_element_by_id('accessKeyId')
         )
-        aws_secret_access_key = WebDriverWait(driver, wait).until(
+        sel_aws_secret_access_key = WebDriverWait(driver, wait).until(
             lambda x: x.find_element_by_id('secretAccessKey')
         )
-        aws_session_token = WebDriverWait(driver, wait).until(
+        sel_aws_session_token = WebDriverWait(driver, wait).until(
             lambda x: x.find_element_by_id('sessionToken')
         )
     except TimeoutException:
@@ -198,9 +197,8 @@ def main(args):
     #Generate dict to pass to credentials file
     aws_creds_dict = {'region': region, 'output': output}
     for i in codelines[-3:]:
-        # Convert string to raw to prevent python from interpreting special characters, eg. /n
+        # Convert string to raw to prevent python from interpreting special characters, eg. \n
         raw_string = r'{}'.format(i.getText().split('=')[1].strip())
-        #aws_creds_dict[i.getText().split('=')[0].strip()] = i.getText().split('=')[1].strip()
         aws_creds_dict[i.getText().split('=')[0].strip()] = raw_string
 
     write_aws_creds(aws_creds_dict)
