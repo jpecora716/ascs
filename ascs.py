@@ -28,7 +28,7 @@ def check_element_id(element_id, driver):
     try:
         element = WebDriverWait(driver, wait).until(
             lambda x: x.find_element_by_id(element_id)
-    )
+        )
         time.sleep(1)
         return element
     except TimeoutException:
@@ -47,9 +47,10 @@ def write_aws_creds(aws_creds):
         config.remove_section('sso')
         config['sso'] = aws_creds
         config.write(configfile)
+    print("Credentials have been written to the [sso] profile")
 
 def main(args):
-    # How long should we wait to check for fields?
+    # Max time in seconds to wait for javascript to populate
     wait = 15
     aws_alias = args.alias
     username = args.username
@@ -57,23 +58,20 @@ def main(args):
     output = args.output
     account = args.account
     role = args.role
-    # Prompt for information that wasn't passed as an argument or if interactive is true
+    # Prompt for information that wasn't passed as an arg or if interactive is true
     if args.interactive or not aws_alias:
         aws_alias = input(f'AWS SSO alias [{aws_alias}]: ')
     if args.interactive or not username:
         username = input(f'Username [{username}]: ')
-
-    password = getpass.getpass()
-
     if args.interactive or not region:
         region = input(f'Region [{region}]: ')
     if args.interactive or not output:
         output = input(f'Output [{output}]: ')
 
-    #driver = webdriver.Chrome('')  # Optional argument, if not specified will search path.
+    password = getpass.getpass()
+
     options = webdriver.ChromeOptions()
     options.add_argument('headless')
-    #options.binary_location = 
     driver = webdriver.Chrome('/usr/lib/chromium-browser/chromedriver', chrome_options=options)
     driver.get(f"https://{aws_alias}.awsapps.com/start#/")
 
@@ -95,7 +93,8 @@ def main(args):
         print("Timeout waiting for portal applications")
         driver.quit()
 
-    time.sleep(1)
+    # Improve this...
+    time.sleep(3)
     soup = BeautifulSoup(driver.page_source, 'lxml')
 
     # Search through all badges for any named AWS Account
@@ -105,6 +104,7 @@ def main(args):
         else:
             print("There doesn't appear to be any AWS Accounts!")
             driver.quit()
+            exit()
 
     sel_aws_account = check_element_id(sel_awsappid, driver)
     sel_aws_account.click()
@@ -118,48 +118,60 @@ def main(args):
         print("Timeout waiting for the AWS Accounts to load")
         driver.quit()
     
-    time.sleep(1)
-
-    soup = BeautifulSoup(driver.page_source, 'lxml')
-
-    count = 0
-    sel_accountids = []
-    accountnames = []
-    for i in (soup.find_all('portal-instance')):
-        if args.interactive == True or not account:
-            print(f"{count}: {i.text.strip()}")
-        sel_accountids.append(i['id'])
-        # Remove account number before adding to accountnames
-        find_accountname = findall("\(.*\)", i.text.strip())
-        accountnames.append(find_accountname[0][1:-1])
-        count += 1
-
-    if args.interactive == True or not account:
-        get_accountid = int(input(f"Enter account: "))
-    elif account in accountnames:
-        get_accountid = accountnames.index(account)
-    
-    sel_aws_account_role = check_element_id(sel_accountids[get_accountid], driver)
-
-    sel_aws_account_role.click()
+    # Improve this...
     time.sleep(3)
 
     soup = BeautifulSoup(driver.page_source, 'lxml')
 
-    count = 0
+    sel_accountids = []
+    accountinfo = []
+    accountnames = []
+    for i in (soup.find_all('portal-instance')):
+        sel_accountids.append(i['id'])
+        # Remove account number before adding to accountnames
+        find_accountname = findall("\(.*\)", i.text.strip())
+        accountnames.append(find_accountname[0][1:-1])
+        # Get the account number and name to loop through if
+        # in interactive or account not passed as argv
+        accountinfo.append(i.text.strip())
+
+    if args.interactive == True or not account:
+        count = 0
+        for i in (accountinfo):
+            print(f"{count}: {i}")
+            count += 1
+        get_accountid = int(input(f"Enter account: "))
+        account = accountnames[get_accountid]
+    elif account in accountnames:
+        get_accountid = accountnames.index(account)
+    else:
+        print(f"{account} not found in {accountnames}")
+        driver.quit()
+        exit()
+    
+    sel_aws_account_role = check_element_id(sel_accountids[get_accountid], driver)
+
+    sel_aws_account_role.click()
+    # Can this be sped up with check_element_id?
+    time.sleep(3)
+
+    soup = BeautifulSoup(driver.page_source, 'lxml')
+
     roles = []
     rolenames = []
     for j in (soup.find_all('portal-profile')):
         rolenames.append(j.find('span', {'class': 'profileName'}).text.strip())
-        if args.interactive == True or not role:
-            print(f"{count}: {rolenames[count]}")
         roles.append(j)
-        count += 1
 
     # Prompt for which role to be assumed here
     # This is shit. Fix all of this and accounts above for proper error checking
     if args.interactive == True or not role:
-        get_role = int(input("Get role: "))
+        count = 0
+        for i in (rolenames):
+            print(f"{count}: {i}")
+            count += 1
+        get_role = int(input("Enter role: "))
+        role = rolenames[get_role]
     elif role in rolenames:
         get_role = rolenames.index(role)
     else:
@@ -177,6 +189,7 @@ def main(args):
 
     sel_aws_roles[get_role].click()
 
+    # Check for aws credentials before scraping them - this might be overkill
     try:
         sel_aws_access_key_id = WebDriverWait(driver, wait).until(
             lambda x: x.find_element_by_id('accessKeyId')
@@ -190,6 +203,7 @@ def main(args):
     except TimeoutException:
         print("Timeout waiting for credentials")
         driver.quit()
+        exit()
 
     soup = BeautifulSoup(driver.page_source, 'lxml')
     codelines = soup.find_all('div', {'class': 'code-line'})
@@ -197,12 +211,17 @@ def main(args):
     #Generate dict to pass to credentials file
     aws_creds_dict = {'region': region, 'output': output}
     for i in codelines[-3:]:
-        # Convert string to raw to prevent python from interpreting special characters, eg. \n
+        # Convert string to raw to prevent python from interpreting special characters
         raw_string = r'{}'.format(i.getText().split('=')[1].strip())
         aws_creds_dict[i.getText().split('=')[0].strip()] = raw_string
 
     write_aws_creds(aws_creds_dict)
 
     driver.quit()
+    if (args.interactive):
+        print(f"Run the following command next time: ./ascs.py --alias {aws_alias}"
+        f" --username {username} --account \"{account}\"" 
+        f" --role \"{role}\" --region {region} --output {output}")
+    exit()
 
 main(args)
