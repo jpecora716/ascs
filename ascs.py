@@ -60,13 +60,13 @@ def main(args):
     role = args.role
     # Prompt for information that wasn't passed as an arg or if interactive is true
     if args.interactive or not aws_alias:
-        aws_alias = input(f'AWS SSO alias [{aws_alias}]: ')
+        aws_alias = input(f'AWS SSO alias [{aws_alias}]: ') or aws_alias
     if args.interactive or not username:
-        username = input(f'Username [{username}]: ')
+        username = input(f'Username [{username}]: ') or username
     if args.interactive or not region:
-        region = input(f'Region [{region}]: ')
+        region = input(f'Region [{region}]: ') or region
     if args.interactive or not output:
-        output = input(f'Output [{output}]: ')
+        output = input(f'Output [{output}]: ') or output
 
     password = getpass.getpass()
 
@@ -220,8 +220,8 @@ def main(args):
     driver.quit()
     if (args.interactive):
         print(f"Run the following command next time: ./ascs.py --alias {aws_alias}"
-        f" --username {username} --account \"{account}\"" 
-        f" --role \"{role}\" --region {region} --output {output}")
+        f" --username {username} --account '{account}'" 
+        f" --role '{role}' --region {region} --output {output}")
     exit()
 
 main(args)
