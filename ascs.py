@@ -20,6 +20,9 @@ parser.add_argument('--role', help="Role to assume")
 parser.add_argument('--list', action='store_true', help="List accounts and roles that can be assumed")
 args = parser.parse_args()
 
+def find_chromedriver():
+    pass
+
 def check_element_id(element_id, driver):
     wait = 15
     try:
