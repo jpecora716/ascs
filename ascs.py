@@ -9,9 +9,6 @@ import time
 import configparser
 import argparse
 
-#TO DO: check if chromedriver exists in path, otherwise check current directory.
-#if it doesn't exist in either location, fail.
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--interactive', '-i', action='store_true', help='Assume Role interactively')
 parser.add_argument('--alias', help='AWS SSO Account Alias')
@@ -40,6 +37,8 @@ def write_aws_creds(aws_creds):
     awscredsfile = awsdir + '/credentials'
     if not os.path.isdir(awsdir):
         os.mkdir(awsdir, 0o700)
+    if not os.path.isfile(awscredsfile):
+        open(awscredsfile, 'a').close()
 
     config = configparser.ConfigParser()
     config.read(awscredsfile)
