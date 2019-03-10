@@ -3,6 +3,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
 from re import findall
+from shutil import which
 import getpass
 import os
 import time
@@ -21,7 +22,14 @@ parser.add_argument('--list', action='store_true', help="List accounts and roles
 args = parser.parse_args()
 
 def find_chromedriver():
-    pass
+    if which('chromedriver'):
+        return which('chromedriver')
+    elif os.path.isfile('/usr/lib/chromium-browser/chromedriver'):
+            return '/usr/lib/chromium-browser/chromedriver'
+    elif os.path.isfile('./chromedriver'):
+            return './chromedriver'
+    else:
+        print("chromedriver not found!")
 
 def check_element_id(element_id, driver):
     wait = 15
@@ -74,7 +82,8 @@ def main(args):
 
     options = webdriver.ChromeOptions()
     options.add_argument('headless')
-    driver = webdriver.Chrome('/usr/lib/chromium-browser/chromedriver', chrome_options=options)
+    driverpath = find_chromedriver()
+    driver = webdriver.Chrome(driverpath, chrome_options=options)
     driver.get(f"https://{aws_alias}.awsapps.com/start#/")
 
     #Check for username and password fields before sending keys
