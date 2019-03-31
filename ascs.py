@@ -104,8 +104,6 @@ def main(args):
         print("Timeout waiting for portal applications")
         driver.quit()
 
-    # Improve this...
-    time.sleep(3)
     soup = BeautifulSoup(driver.page_source, 'lxml')
 
     # Search through all badges for any named AWS Account
@@ -128,9 +126,6 @@ def main(args):
     except TimeoutException:
         print("Timeout waiting for the AWS Accounts to load")
         driver.quit()
-    
-    # Improve this...
-    time.sleep(3)
 
     soup = BeautifulSoup(driver.page_source, 'lxml')
 
@@ -163,8 +158,15 @@ def main(args):
     sel_aws_account_role = check_element_id(sel_accountids[get_accountid], driver)
 
     sel_aws_account_role.click()
-    # Can this be sped up with check_element_id?
-    time.sleep(3)
+
+    #Wait for the AWS Roles to load...
+    try:
+        WebDriverWait(driver, wait).until(
+            lambda x: x.find_element_by_tag_name('portal-profile')
+        )
+    except TimeoutException:
+        print("Timeout waiting for the AWS Roles to load")
+        driver.quit()
 
     soup = BeautifulSoup(driver.page_source, 'lxml')
 
@@ -175,7 +177,6 @@ def main(args):
         roles.append(j)
 
     # Prompt for which role to be assumed here
-    # This is shit. Fix all of this and accounts above for proper error checking
     if args.interactive == True or not role:
         count = 0
         for i in (rolenames):
